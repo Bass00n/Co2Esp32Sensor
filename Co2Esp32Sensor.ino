@@ -1,11 +1,14 @@
-#include <HTTP_Method.h>
-#include <Uri.h>
-#include <WebServer.h>
+// #include <HTTP_Method.h>
+// #include <Uri.h>
+// #include <WebServer.h>
 
 /*****************
    Get CO2 value 
  *****************/
 #include <Arduino.h>
+#include <WiFi.h>
+#include <WiFiMulti.h>
+#include <HTTPClient.h>
 #include "s8_uart.h"
 
 
@@ -32,9 +35,13 @@
   #endif
 #endif
 
-
+WiFiMulti wifiMulti;
 S8_UART *sensor_S8;
 S8_sensor sensor;
+
+const char* ssid = "scat";
+const char* passwd = "6523@TOP";
+String url = "http://java-develop.ru";
 
 
 void setup() {
@@ -71,6 +78,16 @@ void setup() {
   sensor.sensor_id = sensor_S8->get_sensor_ID();
   Serial.print("Sensor ID: 0x"); printIntToHex(sensor.sensor_id, 4); Serial.println("");
 
+
+  wifiMulti.addAP(ssid, passwd);
+  Serial.println("Connecting Wifi...");
+    if(wifiMulti.run() == WL_CONNECTED) {
+        Serial.println("");
+        Serial.println("WiFi connected");
+        Serial.println("IP address: ");
+        Serial.println(WiFi.localIP());
+    }
+
   Serial.println("Setup done!");
   Serial.flush();
 }
@@ -78,43 +95,24 @@ void setup() {
 
 void loop() {
 
-  // Show S8 sensor info
-  // Serial.println(">>> SenseAir S8 NDIR CO2 sensor <<<");
-
-  // Serial.print("Firmware version: "); Serial.println(sensor.firm_version);
-
-  // sensor.sensor_type_id = sensor_S8->get_sensor_type_ID();
-  // Serial.print("Sensor type: 0x"); printIntToHex(sensor.sensor_type_id, 3); Serial.println("");
-
-  // sensor.sensor_id = sensor_S8->get_sensor_ID();
-  // Serial.print("Sensor ID: 0x"); printIntToHex(sensor.sensor_id, 4); Serial.println("");
-
-  // sensor.map_version = sensor_S8->get_memory_map_version();
-  // Serial.print("Memory map version: "); Serial.println(sensor.map_version);
-
-  // sensor.abc_period = sensor_S8->get_ABC_period();
-  
-  // if (sensor.abc_period > 0) {
-  //   Serial.print("ABC (automatic background calibration) period: ");
-  //   Serial.print(sensor.abc_period); Serial.println(" hours");
-  // } else {
-  //   Serial.println("ABC (automatic calibration) is disabled");
-  // }
-  // Serial.println("");
-  // Serial.println("");
-  // Serial.println("");
-  
-  //printf("Millis: %lu\n", millis());
 
   // Get CO2 measure
   sensor.co2 = sensor_S8->get_co2();
   printf("CO2 value = %d ppm\n", sensor.co2);
 
-  //Serial.printf("/*%u*/\n", sensor.co2);   // Format to use with Serial Studio program
-
-  // Compare with PWM output
-  //sensor.pwm_output = sensor_S8->get_PWM_output();
-  //printf("PWM output = %0.0f ppm\n", (sensor.pwm_output / 16383.0) * 2000.0);
+  if(wifiMulti.run() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(url);
+    printf("IP: %s\n", WiFi.localIP().toString());
+    String payload = "CO2 value = ";
+    payload.concat(sensor.co2);
+    int httpCode = http.POST(payload);
+    printf("Response code: %d\n", httpCode);
+  } else {
+    printf("Wifi not connected!\n");
+  }
+  
+  printf("\n");
 
   // Wait 5 second for next measure
   delay(5000);
